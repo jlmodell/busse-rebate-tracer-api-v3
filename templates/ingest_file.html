@@ -1,0 +1,94 @@
+{% extends 'base.html' %} {% block style %}
+<style>
+  li.htmx-swapping {
+    opacity: 0;
+    transition: opacity 1s ease-out;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="uk-card uk-card-default uk-card-body uk-width-1-2@m uk-margin-top">
+  <form id="form" class="" hx-post="/ingest_file" hx-trigger="submit">
+    <div class="">
+      <label for="month"><strong>Month</strong></label>
+      <select name="month" id="month" class="" required>
+        <option value="01">January</option>
+        <option value="02">February</option>
+        <option value="03">March</option>
+        <option value="04">April</option>
+        <option value="05">May</option>
+        <option value="06">June</option>
+        <option value="07">July</option>
+        <option value="08">August</option>
+        <option value="09">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+      </select>
+    </div>
+    <div class="">
+      <label for="year"><strong>Year</strong></label>
+      <input
+        id="year"
+        autocomplete="off"
+        class=""
+        type="text"
+        name="year"
+        placeholder="year as number eg 2022"
+        hx-target="#file_name"
+        hx-get="/files"
+        hx-include="[name='month'],[name='year']"
+        hx-trigger="keyup changed delay:500ms"
+        required
+      />
+    </div>
+    <div class="">
+      <label for="file_name"><strong>File Name</strong></label>
+      <select id="file_name" class="" name="file_name"></select>
+    </div>
+    <div class="">
+      <label for="field_file_name"><strong>JSON Field File</strong></label>
+      <select id="field_file_name" name="field_file_name" class="" required>
+        <option value="">Select a Field File</option>
+        {% for file in field_files %}
+        <option value="{{ file }}">{{ file }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="">
+      <label for="delimiter"><strong>Delimiter</strong> (optional)</label>
+      <input
+        id="delimiter"
+        autocomplete="off"
+        class=""
+        type="text"
+        name="delimiter"
+        placeholder="delimiter eg , | ; etc"
+      />
+    </div>
+    <div class="">
+      <label for="header_row"><strong>Header Row #</strong> (optional)</label>
+      <input
+        id="header_row"
+        autocomplete="off"
+        class=""
+        type="text"
+        name="header_row"
+        placeholder="header_row eg 0 1 2 -1 for None"
+      />
+    </div>
+
+    <div>
+      <button class="" type="submit">Ingest File</button>
+    </div>
+    <div>
+      <button class="secondary" type="reset">Reset</button>
+    </div>
+  </form>
+
+  <div>
+    <pre></pre>
+  </div>
+</div>
+{% endblock %} {% block javascript %}
+<script></script>
+{% endblock %}
