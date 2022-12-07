@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  rebate_tracing_tool:
+    container_name: rebate_tracing_tool
+    build: .
+    ports:
+      - 8185:8185
+    command: "uvicorn --host '0.0.0.0' --port 8188 main:app"
+    restart: unless-stopped
