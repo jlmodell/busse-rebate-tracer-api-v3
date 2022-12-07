@@ -1,12 +1,7 @@
 {% extends 'base.html' %} {% block style %}
-<style>
-  li.htmx-swapping {
-    opacity: 0;
-    transition: opacity 1s ease-out;
-  }
-</style>
+<style></style>
 {% endblock %} {% block content %}
-<div class="uk-card uk-card-default uk-card-body uk-width-1-2@m uk-margin-top">
+<div class="">
   <form id="form" class="" hx-post="/ingest_file" hx-trigger="submit">
     <div class="">
       <label for="month"><strong>Month</strong></label>
@@ -84,10 +79,6 @@
       <button class="secondary" type="reset">Reset</button>
     </div>
   </form>
-
-  <div>
-    <pre></pre>
-  </div>
 </div>
 {% endblock %} {% block javascript %}
 <script></script>

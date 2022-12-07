@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from constants.database_constants import TRACINGS
 from database import delete_documents, gc_rbt, insert_documents
+from finders import find_tracings_and_save
 from s3_functions import get_field_file_body_and_decode_kwargs
 from s3_functions.getters import get_list_of_files
 from transformers import (
@@ -34,7 +35,9 @@ templates = Jinja2Templates(directory="templates")
 
 origins = [
     "http://localhost",
-    "https://rebate_processing_tool.bhd-ny.com",
+    "http://localhost:8000",
+    "https://rebate_tracing_tool.bhd-ny.com/",
+    "https://http://128.1.5.76:8188/",
 ]
 
 app.add_middleware(
@@ -60,7 +63,7 @@ def insert_tracings(field_file_name: str):
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"process": "/ingest_file", "update": "/update_tracings"}
 
 
 @app.get("/ingest_file", response_class=HTMLResponse)
@@ -74,8 +77,9 @@ async def ingest_file_form(request: Request):
     prefix = "input/"
 
     field_files = get_list_of_files(prefix)
+
     field_files = [
-        field_file.lstrip(prefix)
+        field_file.replace(prefix, "")
         for field_file in field_files
         if regex_field_file.search(field_file) is None
     ]
@@ -98,14 +102,12 @@ async def get_files(request: Request, month: str = "", year: str = ""):
     regex_file = re.compile(r"complete", re.IGNORECASE)
 
     field_files = get_list_of_files(key)
-    print(field_files)
+
     field_files = [
-        field_file.lstrip(key)
+        field_file.replace(key, "")
         for field_file in field_files
         if regex_file.search(field_file) is None
     ]
-
-    print(field_files)
 
     context = {
         "request": request,
@@ -146,6 +148,13 @@ async def ingest_file(
 
     background_tasks.add_task(insert_tracings, field_file_name)
 
+    background_tasks.add_task(
+        find_tracings_and_save,
+        month=MONTHS[month],
+        year=year,
+        overwrite=True,
+    )
+
     return {
         "debug": {
             "prefix": prefix,
@@ -160,6 +169,27 @@ async def ingest_file(
         "output": {"key": storage_key, "field_file": field_file_name},
         "status": "success",
     }
+
+
+@app.get("/update_tracings", response_class=HTMLResponse)
+async def get_update_tracings(request: Request):
+    title = "Update tracings from Data Warehouse"
+    context = {
+        "request": request,
+        "title": title,
+    }
+
+    return templates.TemplateResponse("update_tracings.html", context)
+
+
+@app.post("/update_tracings")
+async def post_update_tracings(
+    request: Request, month: str = Form(...), year: str = Form(...)
+):
+
+    df = find_tracings_and_save(MONTHS[month], year, overwrite=True)
+
+    return HTMLResponse(df.to_html(index=False))
 
 
 if __name__ == "__main__":

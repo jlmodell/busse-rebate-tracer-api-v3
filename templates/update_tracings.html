@@ -1,0 +1,46 @@
+{% extends 'base.html' %} {% block style %}
+<style></style>
+{% endblock %} {% block content %}
+<div class="">
+  <form id="form" class="" hx-post="/update_tracings" hx-trigger="submit">
+    <div class="">
+      <label for="month"><strong>Month</strong></label>
+      <select name="month" id="month" class="" required>
+        <option value="01">January</option>
+        <option value="02">February</option>
+        <option value="03">March</option>
+        <option value="04">April</option>
+        <option value="05">May</option>
+        <option value="06">June</option>
+        <option value="07">July</option>
+        <option value="08">August</option>
+        <option value="09">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+      </select>
+    </div>
+    <div class="">
+      <label for="year"><strong>Year</strong></label>
+      <input
+        id="year"
+        autocomplete="off"
+        class=""
+        type="text"
+        name="year"
+        placeholder="year as number eg 2022"
+        required
+      />
+    </div>
+
+    <div>
+      <button class="" type="submit">Ingest File</button>
+    </div>
+    <div>
+      <button class="secondary" type="reset">Reset</button>
+    </div>
+  </form>
+</div>
+{% endblock %} {% block javascript %}
+<script></script>
+{% endblock %}
