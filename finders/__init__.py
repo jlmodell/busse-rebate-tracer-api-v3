@@ -3,8 +3,9 @@ import pandas as pd
 from functools import lru_cache
 import re
 from rich import print
+import httpx
 
-from constants import CONTRACTS, PRICING_CONTRACTS, TRACINGS
+from constants import CONTRACTS, PRICING_CONTRACTS, TRACINGS, DISCORD_URL
 from database import gc_rbt, gc_bp, find_contract_by_contract_number
 from s3_functions import (
     save_df_to_s3_as_excel,
@@ -176,5 +177,9 @@ def find_tracings_and_save(
         save_df_to_s3_as_excel(
             df, f"output/{period}/", "tracings_by_distributor_by_contract_by_part.xlsm"
         )
+
+    content = f"Tracings for {period} are ready."
+
+    httpx.post(DISCORD_URL, json={"content": content})
 
     return df_with_summary
