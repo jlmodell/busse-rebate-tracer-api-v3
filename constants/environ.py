@@ -15,3 +15,6 @@ ACCESS_KEY = os.environ["S3_ACCESS_KEY"]
 SECRET_KEY = os.environ["S3_SECRET_KEY"]
 S3_URL = os.environ["S3_URL"]
 S3_BUCKET = os.environ["S3_BUCKET"]
+
+assert os.environ["DISCORD_URL"], "DISCORD_URL not set"
+DISCORD_URL = os.environ["DISCORD_URL"]

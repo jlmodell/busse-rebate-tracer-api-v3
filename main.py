@@ -1,3 +1,8 @@
+import re
+import logging
+import httpx
+from constants import DISCORD_URL
+from datetime import datetime, timedelta
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Form, Request, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -11,8 +16,12 @@ from transformers import (
     build_df_from_warehouse_using_fields_file,
     ingest_to_data_warehouse,
 )
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
-import re
+logging.basicConfig()
+logging.getLogger("apscheduler").setLevel(logging.DEBUG)
+
 
 MONTHS = {
     "01": "January",
@@ -28,6 +37,48 @@ MONTHS = {
     "11": "November",
     "12": "December",
 }
+
+
+def check_if_files_exist():
+    now = datetime.now()
+    prev_month = now - timedelta(days=30)
+
+    this_month_str = MONTHS[now.strftime("%m")]
+    prev_month_str = MONTHS[prev_month.strftime("%m")]
+
+    this_year_str = now.strftime("%Y")
+    prev_year_str = prev_month.strftime("%Y")
+
+    key_current_month = f"rebate_trace_files/{this_month_str.lower()} {this_year_str}/"
+    key_previous_month = f"rebate_trace_files/{prev_month_str.lower()} {prev_year_str}/"
+
+    regex_file = re.compile(r"complete", re.IGNORECASE)
+
+    for key in [key_current_month, key_previous_month]:
+        files = get_list_of_files(key)
+        files = [
+            file.replace(key, "") for file in files if regex_file.search(file) is None
+        ]
+
+        if len(files) < 2:
+            content = f"No files found for {key}"
+        else:
+            content = f"Files found for {key}: {files}"
+
+        httpx.post(DISCORD_URL, json={"content": content})
+
+
+def insert_tracings(field_file_name: str):
+    field_file = get_field_file_body_and_decode_kwargs("input/", field_file_name)
+    df = build_df_from_warehouse_using_fields_file(field_file_name)
+    collection = gc_rbt(TRACINGS)
+
+    try:
+        delete_documents(collection, {"period": field_file.get("period")})
+        insert_documents(collection, df.to_dict("records"))
+    except Exception as e:
+        print(e)
+
 
 app = FastAPI()
 
@@ -49,16 +100,19 @@ app.add_middleware(
 )
 
 
-def insert_tracings(field_file_name: str):
-    field_file = get_field_file_body_and_decode_kwargs("input/", field_file_name)
-    df = build_df_from_warehouse_using_fields_file(field_file_name)
-    collection = gc_rbt(TRACINGS)
+@app.on_event("startup")
+async def startup_event():
+    scheduler = AsyncIOScheduler()
 
-    try:
-        delete_documents(collection, {"period": field_file.get("period")})
-        insert_documents(collection, df.to_dict("records"))
-    except Exception as e:
-        print(e)
+    check_if_files_exist()
+
+    scheduler.add_job(
+        check_if_files_exist,
+        "interval",
+        minutes=30,
+        id="check_if_files_exist",
+        replace_existing=True,
+    )
 
 
 @app.get("/")
@@ -96,8 +150,6 @@ async def ingest_file_form(request: Request):
 @app.get("/files")
 async def get_files(request: Request, month: str = "", year: str = ""):
     key = f"rebate_trace_files/{MONTHS[month].lower()} {year}/"
-
-    print(key)
 
     regex_file = re.compile(r"complete", re.IGNORECASE)
 
