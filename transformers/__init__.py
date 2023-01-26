@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime
 from functools import lru_cache
 from glob import glob
 
@@ -280,6 +281,8 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
     cull_missing_contracts = kwargs.get("cull_missing_contracts", False)
     uom_regex = kwargs.get("uom_regex", None)
 
+    added_to_queue = "added_to_queue"
+
     # /initialize variables for dataframe from fields_file
 
     # initialize columns for dataframe
@@ -307,6 +310,7 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         postal=postal,
         uom=uom,
         cost=cost,
+        added_to_queue=added_to_queue,
     )
 
     # /initialize columns for dataframe
@@ -374,6 +378,8 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         if isinstance(x, str)
         else str(x)
     )
+
+    df[added_to_queue] = datetime.now()
 
     df[name] = df[name].apply(lambda x: x.lower().lstrip('="').rstrip('"').strip())
 

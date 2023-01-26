@@ -24,6 +24,7 @@ def SET_COLUMNS(
     postal: str,
     uom: str,
     cost: str,
+    added_to_queue: str,
 ) -> Tuple[List[str], List[str]]:
 
     return (
@@ -50,6 +51,7 @@ def SET_COLUMNS(
             cs_conv,
             rebate,
             cost,
+            added_to_queue,
         ],
         [
             "period",
@@ -74,5 +76,6 @@ def SET_COLUMNS(
             "ship_qty_as_cs",
             "rebate",
             "cost",
+            "added_to_queue",
         ],
     )
