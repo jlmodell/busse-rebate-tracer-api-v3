@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from datetime import datetime, timedelta
@@ -78,12 +79,17 @@ def insert_tracings(
     # field_file = get_field_file_body_and_decode_kwargs("input/", field_file_name)
     df = build_df_from_warehouse_using_fields_file(field_file_name)
 
-    list_of_dict_json = df.to_json(orient="table", index=False)["data"]
+    json_string = df.to_json(orient="table", index=False)
+
+    list_of_dict_json = json.loads(json_string)["data"]
 
     try:
         for each in list_of_dict_json:
             push_to_redis_queue(each)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+    try:
         move_file_to_completed_folder(prefix, storage_key, success_key)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
