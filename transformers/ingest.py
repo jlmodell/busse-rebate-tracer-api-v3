@@ -1,9 +1,13 @@
-import re
-import os
-import pandas as pd
-import numpy as np
 import io
+import os
+import re
+
+import numpy as np
+import pandas as pd
+
 from s3_storage import CLIENT, S3_BUCKET
+
+STR_FIELDS = r"(PART|CAT|MATERIAL|ITEM|INVOICE|ORDER|post(al)|zip|zip(code| code))"
 
 
 def GET_DTYPES(file_path: str, delimiter: str = ",", header_row: int = 0) -> dict:
@@ -25,7 +29,7 @@ def GET_DTYPES(file_path: str, delimiter: str = ",", header_row: int = 0) -> dic
 
     try:
         for key in dtypes.keys():
-            if re.search(r"(PART|CAT|MATERIAL|ITEM|INVOICE|ORDER)", key, re.IGNORECASE):
+            if re.search(STR_FIELDS, key, re.IGNORECASE):
                 dtypes[key] = "str"
     except Exception as e:
         print(e)
@@ -60,7 +64,7 @@ def GET_DTYPES_S3(
 
     try:
         for key in dtypes.keys():
-            if re.search(r"(PART|CAT|MATERIAL|ITEM)", key, re.IGNORECASE):
+            if re.search(STR_FIELDS, key, re.IGNORECASE):
                 dtypes[key] = "str"
     except Exception as e:
         print(e)
@@ -76,7 +80,7 @@ def GET_CLEAN_DF_TO_INGEST(
     df = df[df[df.columns[0]] != ""].copy()
     try:
         df = df[df["UOM"].notnull()]
-    except Exception as e:
+    except Exception:
         pass
 
     cols = df.columns
@@ -87,7 +91,7 @@ def GET_CLEAN_DF_TO_INGEST(
             if col == "PART NBR":
                 df[col] = df[col].str.lstrip("0")
 
-        except Exception as e:
+        except Exception:
             pass
 
     df = df.replace(np.nan, "", regex=True).copy()
@@ -100,5 +104,7 @@ def GET_CLEAN_DF_TO_INGEST(
     df["__month__"] = month
 
     df.columns = [str(x) for x in df.columns]
+
+    return df
 
     return df

@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import List, Tuple
 
 
 def SET_COLUMNS(
@@ -21,6 +21,7 @@ def SET_COLUMNS(
     addr: str,
     city: str,
     state: str,
+    postal: str,
     uom: str,
     cost: str,
 ) -> Tuple[List[str], List[str]]:
@@ -32,6 +33,7 @@ def SET_COLUMNS(
             addr,
             city,
             state,
+            postal,
             gpo,
             lic,
             score,
@@ -55,6 +57,7 @@ def SET_COLUMNS(
             "addr",
             "city",
             "state",
+            "postal",
             "gpo",
             "license",
             "searchScore",

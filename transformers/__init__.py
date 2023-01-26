@@ -1,27 +1,21 @@
-import pandas as pd
-from glob import glob
 import os
 import re
 from functools import lru_cache
-from pymongo.collection import Collection
+from glob import glob
 
+import pandas as pd
+from pymongo.collection import Collection
 from rich import print
 
-from constants import (
-    DATA_WAREHOUSE,
-    ROSTERS,
-    SCHED_DATA,
-    DATA_WAREHOUSE,
-    VHA_VIZIENT_MEDASSETS,
-)
+from constants import DATA_WAREHOUSE, ROSTERS, SCHED_DATA, VHA_VIZIENT_MEDASSETS
 from database import (
+    delete_documents,
     gc_rbt,
+    get_current_contracts,
     get_documents,
     insert_documents,
-    delete_documents,
-    get_current_contracts,
 )
-from s3_functions import get_field_file_body_and_decode_kwargs, SET_COLUMNS
+from s3_functions import SET_COLUMNS, get_field_file_body_and_decode_kwargs
 
 from .ingest import *
 from .load import *
@@ -74,7 +68,7 @@ def ingest_to_data_warehouse(
     else:
 
         assert file_path is not None, "file_path is required"
-        assert os.path.exists(file_path) == True, "File not found"
+        assert os.path.exists(file_path) is True, "File not found"
 
         dtype = GET_DTYPES(file_path, delimiter=delimiter, header_row=header_row)
 
@@ -274,6 +268,7 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
     addr = kwargs.get("addr")
     city = kwargs.get("city")
     state = kwargs.get("state")
+    postal = kwargs.get("postal", "0")
     uom = kwargs.get("uom", None)
     cost = kwargs.get("cost")
     addr1 = kwargs.get("addr1", None)
@@ -307,6 +302,7 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         addr=addr,
         city=city,
         state=state,
+        postal=postal,
         uom=uom,
         cost=cost,
     )
@@ -336,7 +332,7 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
     if contract_map:
         df[contract] = df[contract].apply(lambda x: contract_map.get(x, x))
 
-    if addr != None:
+    if addr is not None:
         df[addr] = df[addr].apply(lambda x: x.lower().lstrip('="').rstrip('"').strip())
 
     if addr1 and addr2:
@@ -353,7 +349,7 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
 
         df[addr] = df.apply(lambda x: FIX_ADDRESS(x[addr1], x[addr2]), axis=1)
 
-    if uom_regex != None:
+    if uom_regex is not None:
         df[uom] = df[uom].apply(lambda x: re.sub(uom_regex, "", x).strip())
     else:
         if uom:
