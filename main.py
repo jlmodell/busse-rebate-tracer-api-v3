@@ -1,23 +1,27 @@
-import re
 import logging
-import httpx
-from constants import DISCORD_URL
+import re
 from datetime import datetime, timedelta
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Form, Request, Response
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+
+import httpx
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from constants.database_constants import TRACINGS
-from database import delete_documents, gc_rbt, insert_documents
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
+from constants import DISCORD_URL
+from database.redis_connector import push_to_redis_queue
+
+# from database import delete_documents, gc_rbt, insert_documents
 from finders import find_tracings_and_save
-from s3_functions import get_field_file_body_and_decode_kwargs
+from s3_functions import move_file_to_completed_folder
+
+# from s3_functions import get_field_file_body_and_decode_kwargs
 from s3_functions.getters import get_list_of_files
 from transformers import (
     build_df_from_warehouse_using_fields_file,
     ingest_to_data_warehouse,
 )
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.schedulers.background import BackgroundScheduler
 
 logging.basicConfig()
 logging.getLogger("apscheduler").setLevel(logging.DEBUG)
@@ -68,16 +72,31 @@ def check_if_files_exist():
         httpx.post(DISCORD_URL, json={"content": content})
 
 
-def insert_tracings(field_file_name: str):
-    field_file = get_field_file_body_and_decode_kwargs("input/", field_file_name)
+def insert_tracings(
+    field_file_name: str, prefix: str, storage_key: str, success_key: str
+):
+    # field_file = get_field_file_body_and_decode_kwargs("input/", field_file_name)
     df = build_df_from_warehouse_using_fields_file(field_file_name)
-    collection = gc_rbt(TRACINGS)
+
+    list_of_dict_json = df.to_json(orient="table", index=False)["data"]
 
     try:
-        delete_documents(collection, {"period": field_file.get("period")})
-        insert_documents(collection, df.to_dict("records"))
+        for each in list_of_dict_json:
+            push_to_redis_queue(each)
+
+        move_file_to_completed_folder(prefix, storage_key, success_key)
     except Exception as e:
-        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # s3 move file to completed folder
+
+    # collection = gc_rbt(TRACINGS)
+
+    # try:
+    #     delete_documents(collection, {"period": field_file.get("period")})
+    #     insert_documents(collection, df.to_dict("records"))
+    # except Exception as e:
+    #     print(e)
 
 
 app = FastAPI()
@@ -185,6 +204,7 @@ async def ingest_file(
         raise HTTPException(status_code=400, detail="Invalid month")
 
     storage_key = f"{MONTHS[month].lower()} {year}/{file_name}"
+    success_key = f"{MONTHS[month].lower()} {year}/completed/{file_name}"
 
     background_tasks.add_task(
         ingest_to_data_warehouse,
@@ -198,13 +218,8 @@ async def ingest_file(
         header_row=int(header_row),
     )
 
-    background_tasks.add_task(insert_tracings, field_file_name)
-
     background_tasks.add_task(
-        find_tracings_and_save,
-        month=MONTHS[month],
-        year=year,
-        overwrite=True,
+        insert_tracings, field_file_name, prefix, storage_key, success_key
     )
 
     return {
@@ -238,7 +253,6 @@ async def get_update_tracings(request: Request):
 async def post_update_tracings(
     request: Request, month: str = Form(...), year: str = Form(...)
 ):
-
     df = find_tracings_and_save(MONTHS[month], year, overwrite=True)
 
     return HTMLResponse(df.to_html(index=False))

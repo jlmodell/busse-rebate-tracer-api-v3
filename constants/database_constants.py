@@ -13,10 +13,7 @@ DISCREPANCIES = "DISCREPANCIES"
 PRICING_CONTRACTS = "PRICING_CONTRACTS"
 
 # databases
-DATABASES = {
-    BUSSE_REBATE_TRACES: "busserebatetraces",
-    BUSSE_PRICING: "bussepricing"
-}
+DATABASES = {BUSSE_REBATE_TRACES: "busserebatetraces", BUSSE_PRICING: "bussepricing"}
 
 # collections
 BUSSE_REBATE_TRACES_COLLECTIONS = {
@@ -37,3 +34,6 @@ BUSSE_PRICING_COLLECTIONS = {
 
 # indexes
 ATLAS_SEARCH_INDEX_NAME = "find_license"
+
+# redis
+REDIS_QUEUE = "queue:raw_rebate_data"

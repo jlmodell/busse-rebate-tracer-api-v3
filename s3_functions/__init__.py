@@ -1,11 +1,12 @@
-from typing import Optional
-from s3_storage import CLIENT, S3_BUCKET
 import json
-from datetime import datetime
 import os
+from datetime import datetime
+from typing import Optional
 
-from .savers import *
+from s3_storage import CLIENT, S3_BUCKET
+
 from .field_file import *
+from .savers import *
 
 
 def get_field_file_body_and_decode_kwargs(prefix: str, key: str) -> dict:
@@ -81,3 +82,13 @@ def save_tracings_df_as_html_with_javascript_css(
     data = GET_HTML_WITH_JS_CSS(df)
 
     CLIENT.put_object(Bucket=S3_BUCKET, Key=prefix + filename, Body=data)
+
+
+def move_file_to_completed_folder(prefix: str, storage_key: str, success_key: str):
+    CLIENT.copy_object(
+        Bucket=S3_BUCKET,
+        CopySource={"Bucket": S3_BUCKET, "Key": prefix + storage_key},
+        Key=prefix + success_key,
+    )
+
+    CLIENT.delete_object(Bucket=S3_BUCKET, Key=prefix + storage_key)

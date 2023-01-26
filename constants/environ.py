@@ -1,5 +1,6 @@
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.getcwd(), ".env"))
 
@@ -18,3 +19,8 @@ S3_BUCKET = os.environ["S3_BUCKET"]
 
 assert os.environ["DISCORD_URL"], "DISCORD_URL not set"
 DISCORD_URL = os.environ["DISCORD_URL"]
+
+assert os.environ["REDIS_URL"], "REDIS_URL not set"
+assert os.environ["REDIS_PASS"], "REDIS_PASS not set"
+REDIS_URL, REDIS_PORT = os.environ["REDIS_URL"].split(":")
+REDIS_PASS = os.environ["REDIS_PASS"]

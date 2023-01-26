@@ -1,5 +1,10 @@
-from .connector import *
-from constants import CONTRACTS, PRICING_CONTRACTS
+from .connector import GET_CLIENT, GET_COLLECTION, GET_DATABASE
+
+from pymongo.collection import Collection
+
+from constants import BUSSE_PRICING, BUSSE_REBATE_TRACES, CONTRACTS, PRICING_CONTRACTS
+
+
 
 
 def gc_rbt(collection_key: str) -> Collection:
@@ -29,8 +34,7 @@ def insert_documents(collection: Collection, documents: list) -> None:
 def get_current_contracts():
     collection = gc_rbt(CONTRACTS)
 
-    return {x["contract"]: x["gpo"]
-            for x in list(collection.find({"valid": True}))}
+    return {x["contract"]: x["gpo"] for x in list(collection.find({"valid": True}))}
 
 
 def find_contract_by_contract_number(contract_number: str = None) -> dict:
@@ -38,9 +42,12 @@ def find_contract_by_contract_number(contract_number: str = None) -> dict:
 
     collection = gc_bp(PRICING_CONTRACTS)
 
-    res = collection.find_one({
-        "contractnumber": contract_number,
-    }, {"_id": 0})
+    res = collection.find_one(
+        {
+            "contractnumber": contract_number,
+        },
+        {"_id": 0},
+    )
 
     return res
 
