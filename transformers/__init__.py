@@ -50,6 +50,7 @@ def ingest_to_data_warehouse(
                     CLIENT.get_object(Bucket=S3_BUCKET, Key=prefix + key)["Body"].read()
                 ),
                 header=header_row if header_row != -1 else None,
+                dtype=dtype,
             )
 
         elif re.search(r".(csv|txt)$", key, re.IGNORECASE):
@@ -59,6 +60,7 @@ def ingest_to_data_warehouse(
                 ),
                 delimiter=delimiter,
                 header=header_row if header_row != -1 else None,
+                dtype=dtype,
             )
 
         df = GET_CLEAN_DF_TO_INGEST(

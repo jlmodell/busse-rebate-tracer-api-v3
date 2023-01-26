@@ -69,6 +69,8 @@ def GET_DTYPES_S3(
     except Exception as e:
         print(e)
 
+    print(dtypes)
+
     return dtypes
 
 
