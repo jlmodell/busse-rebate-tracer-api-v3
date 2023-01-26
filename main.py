@@ -107,7 +107,8 @@ origins = [
     "http://localhost",
     "http://localhost:8000",
     "https://rebate_tracing_tool.bhd-ny.com/",
-    "https://http://128.1.5.76:8188/",
+    "http://128.1.5.76:8188/",
+    "http://128.1.5.126:8188/",
 ]
 
 app.add_middleware(
