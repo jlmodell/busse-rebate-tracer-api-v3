@@ -9,6 +9,7 @@ from pymongo.collection import Collection
 from rich import print
 
 from constants import DATA_WAREHOUSE, ROSTERS, SCHED_DATA, VHA_VIZIENT_MEDASSETS
+from constants.database_constants import TRACINGS
 from database import (
     delete_documents,
     gc_rbt,
@@ -235,6 +236,7 @@ def add_gpo_to_df(contract: str) -> str:
 
 def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
     data_warehouse_collection = gc_rbt(DATA_WAREHOUSE)
+    tracings_collection = gc_rbt(TRACINGS)
 
     hidden = "hidden"
     gpo = "GPO"
@@ -283,10 +285,6 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
 
     added_to_queue = "added_to_queue"
 
-    # /initialize variables for dataframe from fields_file
-
-    # initialize columns for dataframe
-
     orig_cols, output_cols = SET_COLUMNS(
         hidden=hidden,
         gpo=gpo,
@@ -313,23 +311,9 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         added_to_queue=added_to_queue,
     )
 
-    # /initialize columns for dataframe
-
-    # initialize dataframe
-
-    print(filter)
-
     datawarehouse = get_documents(data_warehouse_collection, filter)
 
-    print(datawarehouse)
-
     df = pd.DataFrame(datawarehouse)
-
-    # /initialize dataframe
-
-    print(df)
-
-    # clean df
 
     df[hidden] = df.apply(lambda _: period, axis=1)
 
@@ -352,6 +336,9 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
             if isinstance(x, str)
             else ""
         )
+
+        orig_cols[2] = "addr"
+        addr = "addr"
 
         df[addr] = df.apply(lambda x: FIX_ADDRESS(x[addr1], x[addr2]), axis=1)
 
@@ -458,7 +445,7 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         df[unit_rebate] = df[unit_rebate].apply(pd.to_numeric)
     else:
         unit_rebate = "unit_rebate"
-        orig_cols[15] = unit_rebate
+        orig_cols[16] = unit_rebate
         df[unit_rebate] = df.apply(lambda x: x[rebate] / x[ship_qty], axis=1)
 
     if cost_calculation == "cost - rebate * ship_qty":
@@ -466,20 +453,12 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
     elif cost_calculation == "cost * ship_qty":
         df[cost] = df.apply(lambda x: x[cost] * x[ship_qty], axis=1)
 
-    # /clean df
-
-    # add gpo
-
     print("add_gpo() >\t", add_gpo_to_df.cache_info())
     df[gpo] = df.apply(lambda x: add_gpo_to_df(x[contract]), axis=1)
     print("add_gpo() >\t", add_gpo_to_df.cache_info())
 
     if cull_missing_contracts:
         df = df[df[contract] != ""].copy()
-
-    # /add gpo
-
-    # add license and search score and a check column
 
     if skip_license:
         df[lic] = ""
@@ -500,10 +479,6 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         confidence_min = df[score].mean() * 0.85
         df[check] = df.apply(lambda x: x[score] <= confidence_min, axis=1)
 
-    # /add license and search score and a check column
-
-    # convert uom
-
     print("find_item_and_convert_uom() >\t", find_item_and_convert_uom.cache_info())
     df[cs_conv] = df.apply(
         lambda x: find_item_and_convert_uom(
@@ -513,10 +488,16 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
     )
     print("find_item_and_convert_uom() >\t", find_item_and_convert_uom.cache_info())
 
-    # /convert uom
+    df = df[orig_cols].copy()
 
-    df = df[orig_cols].sort_values(by=[lic, contract, part])
+    df.sort_values(by=[gpo, lic, part], inplace=True)
 
     df.columns = output_cols
+
+    tracings_collection.delete_many(
+        {
+            "period": period,
+        }
+    )
 
     return df

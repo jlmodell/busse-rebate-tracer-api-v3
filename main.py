@@ -11,16 +11,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from constants import DISCORD_URL
-from constants.database_constants import TRACINGS
-from database import delete_documents, gc_rbt
 from database.redis_connector import push_to_redis_queue
 
 # from database import delete_documents, gc_rbt, insert_documents
 from finders import find_tracings_and_save
-from s3_functions import (
-    get_field_file_body_and_decode_kwargs,
-    move_file_to_completed_folder,
-)
+from s3_functions import move_file_to_completed_folder
 
 # from s3_functions import get_field_file_body_and_decode_kwargs
 from s3_functions.getters import get_list_of_files
@@ -81,8 +76,6 @@ def check_if_files_exist():
 def insert_tracings(
     field_file_name: str, prefix: str, storage_key: str, success_key: str
 ):
-    field_file = get_field_file_body_and_decode_kwargs("input/", field_file_name)
-
     df = build_df_from_warehouse_using_fields_file(field_file_name)
 
     json_string = df.to_json(orient="table", index=False)
@@ -92,12 +85,6 @@ def insert_tracings(
     try:
         for each in list_of_dict_json:
             push_to_redis_queue(each)
-
-        period = field_file.get("period", None)
-
-        if period is not None:
-            tracings = gc_rbt(TRACINGS)
-            delete_documents(tracings, {"period": period})
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
