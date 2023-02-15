@@ -387,22 +387,22 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
 
     try:
         df[invoice_date] = df[invoice_date].apply(pd.to_datetime)
-    except:
+    except Exception:
         try:
             df[invoice_date] = df[invoice_date].apply(
                 lambda x: pd.to_datetime(x, format="%m/%d/%Y")
             )
-        except:
+        except Exception:
             try:
                 df[invoice_date] = df[invoice_date].apply(
                     lambda x: pd.to_datetime(x, format="%y%m%d")
                 )
-            except:
+            except Exception:
                 try:
                     df[invoice_date] = df[invoice_date].apply(
                         lambda x: pd.to_datetime(x, format="%m%d%Y")
                     )
-                except:
+                except Exception:
                     print("Could not convert invoice_date to datetime")
 
     if part_regex:
