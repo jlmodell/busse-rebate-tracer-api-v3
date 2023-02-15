@@ -79,6 +79,9 @@ def SET_COLUMNS(
         "added_to_queue",
     ]
 
+    print("original_columns", original_columns)
+    print("output_columns", output_columns)
+
     return (
         original_columns,
         output_columns,
