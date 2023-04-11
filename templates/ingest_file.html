@@ -1,5 +1,11 @@
 {% extends 'base.html' %} {% block style %}
-<style></style>
+<style>
+  field_file_grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 10px;
+  }
+</style>
 {% endblock %} {% block content %}
 <div class="">
   <form id="form" class="" hx-post="/ingest_file" hx-trigger="submit">
@@ -42,13 +48,28 @@
     </div>
     <div class="">
       <label for="field_file_name"><strong>JSON Field File</strong></label>
-      <select id="field_file_name" name="field_file_name" class="" required>
+      <select
+        id="field_file_name"
+        name="field_file_name"
+        class=""
+        required
+        hx-get="/field_file"
+        hx-target="#field_file"
+        hx-include="[name='field_file_name']"
+        hx-trigger="change delay:500ms"
+      >
         <option value="">Select a Field File</option>
         {% for file in field_files %}
         <option value="{{ file }}">{{ file }}</option>
         {% endfor %}
       </select>
     </div>
+
+    <div class="">
+      <label><strong>Field File</strong></label>
+      <div id="field_file" class=""></div>
+    </div>
+
     <div class="">
       <label for="delimiter"><strong>Delimiter</strong> (optional)</label>
       <input

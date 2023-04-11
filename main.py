@@ -15,7 +15,10 @@ from database.redis_connector import push_to_redis_queue
 
 # from database import delete_documents, gc_rbt, insert_documents
 from finders import find_tracings_and_save
-from s3_functions import move_file_to_completed_folder
+from s3_functions import (
+    get_field_file_body_and_decode_kwargs,
+    move_file_to_completed_folder,
+)
 
 # from s3_functions import get_field_file_body_and_decode_kwargs
 from s3_functions.getters import get_list_of_files
@@ -193,6 +196,31 @@ async def get_files(request: Request, month: str = "", year: str = ""):
     }
 
     return templates.TemplateResponse("fragments/files.html", context)
+
+
+@app.get("/field_file")
+async def print_field_file(request: Request, field_file_name: str = ""):
+    prefix = "input/"
+
+    field_file = get_field_file_body_and_decode_kwargs(prefix, field_file_name)
+    field_file = {
+        "month": field_file.get("month"),
+        "year": field_file.get("year"),
+        "filter.__file__": field_file.get("filter").get("__file__"),
+        "filter.__month__": field_file.get("filter").get("__month__"),
+        "filter.__year__": field_file.get("filter").get("__year__"),
+        "period": field_file.get("period"),
+        "file": field_file.get("file"),
+    }
+
+    context = {
+        "request": request,
+        "field_file": field_file,
+    }
+
+    print(field_file)
+
+    return templates.TemplateResponse("fragments/field_file.html", context)
 
 
 @app.post("/ingest_file")

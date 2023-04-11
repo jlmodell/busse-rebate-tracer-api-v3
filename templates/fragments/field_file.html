@@ -1,0 +1,6 @@
+{% for k,v in field_file.items() %}
+<div class="field_file_grid">
+  <label>{{ k }}</label>
+  <input disabled="true" type="text" name="{{ k }}" value="{{ v }}" />
+</div>
+{% endfor %}
