@@ -313,9 +313,13 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
 
     datawarehouse = get_documents(data_warehouse_collection, filter)
 
+    print(datawarehouse[:5])
+
     df = pd.DataFrame(datawarehouse)
 
     df[hidden] = df.apply(lambda _: period, axis=1)
+
+    print(df)
 
     df = df[df[name].notna()].copy()
 
