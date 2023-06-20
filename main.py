@@ -19,6 +19,7 @@ from s3_functions import (
     get_field_file_body_and_decode_kwargs,
     move_file_to_completed_folder,
 )
+from database import get_current_contracts
 
 # from s3_functions import get_field_file_body_and_decode_kwargs
 from s3_functions.getters import get_list_of_files
@@ -128,9 +129,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+current_contracts = get_current_contracts()
+
+def refresh_current_contracts():
+    global current_contracts
+    current_contracts = get_current_contracts()
 
 @app.on_event("startup")
 async def startup_event():
+    global current_contracts
     scheduler = AsyncIOScheduler()
 
     check_if_files_exist()
@@ -141,6 +148,14 @@ async def startup_event():
         minutes=30,
         id="check_if_files_exist",
         replace_existing=True,
+    )
+
+    scheduler.add_job(
+        refresh_current_contracts,
+        "interval",
+        minutes=360,
+        id="refresh_current_contracts",
+        replace_existing=True
     )
 
 

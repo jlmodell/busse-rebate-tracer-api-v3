@@ -22,8 +22,9 @@ from s3_functions import SET_COLUMNS, get_field_file_body_and_decode_kwargs
 from .ingest import *
 from .load import *
 
-roster_collection = gc_rbt(ROSTERS)
+from main import current_contracts
 
+roster_collection = gc_rbt(ROSTERS)
 
 def ingest_to_data_warehouse(
     year: str,
@@ -224,12 +225,8 @@ def add_license(gpo: str, name: str, address: str, city: str, state: str) -> str
 
     return f"{lic}|{score}"
 
-
-current_contracts = get_current_contracts()
-
-
-@lru_cache(maxsize=None)
 def add_gpo_to_df(contract: str) -> str:
+    global current_contracts
     contract = contract.upper().strip()
     return current_contracts.get(contract, "MISSING CONTRACT").upper()
 
