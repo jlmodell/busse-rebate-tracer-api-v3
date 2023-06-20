@@ -36,6 +36,11 @@ def get_current_contracts():
 
     return {x["contract"]: x["gpo"] for x in list(collection.find({"valid": True}))}
 
+current_contracts = get_current_contracts()
+
+def refresh_current_contracts():
+    global current_contracts
+    current_contracts = get_current_contracts()
 
 def find_contract_by_contract_number(contract_number: str = None) -> dict:
     assert contract_number is not None, "contract_number cannot be None"

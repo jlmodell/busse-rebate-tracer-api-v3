@@ -13,16 +13,14 @@ from constants.database_constants import TRACINGS
 from database import (
     delete_documents,
     gc_rbt,
-    get_current_contracts,
+    current_contracts,
     get_documents,
-    insert_documents,
+    insert_documents,    
 )
 from s3_functions import SET_COLUMNS, get_field_file_body_and_decode_kwargs
 
 from .ingest import *
 from .load import *
-
-from main import current_contracts
 
 roster_collection = gc_rbt(ROSTERS)
 
