@@ -452,9 +452,9 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
     elif cost_calculation == "cost * ship_qty":
         df[cost] = df.apply(lambda x: x[cost] * x[ship_qty], axis=1)
 
-    print("add_gpo() >\t", add_gpo_to_df.cache_info())
+    # print("add_gpo() >\t", add_gpo_to_df.cache_info())
     df[gpo] = df.apply(lambda x: add_gpo_to_df(x[contract]), axis=1)
-    print("add_gpo() >\t", add_gpo_to_df.cache_info())
+    # print("add_gpo() >\t", add_gpo_to_df.cache_info())
 
     if cull_missing_contracts:
         df = df[df[contract] != ""].copy()
