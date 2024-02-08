@@ -7,4 +7,6 @@ services:
     ports:
       - 8188:8188
     command: "uvicorn --host '0.0.0.0' --port 8188 main:app"
+    volumes:
+      - ./.scrat:.scrat
     restart: unless-stopped
