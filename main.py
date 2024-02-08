@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 from datetime import datetime, timedelta
 
@@ -11,26 +12,22 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from constants import DISCORD_URL
+from database import refresh_current_contracts
 from database.redis_connector import push_to_redis_queue
-
 # from database import delete_documents, gc_rbt, insert_documents
 from finders import find_tracings_and_save
-from s3_functions import (
-    get_field_file_body_and_decode_kwargs,
-    move_file_to_completed_folder,
-)
-from database import refresh_current_contracts
-
+from s3_functions import (get_field_file_body_and_decode_kwargs,
+                          move_file_to_completed_folder)
 # from s3_functions import get_field_file_body_and_decode_kwargs
 from s3_functions.getters import get_list_of_files
-from transformers import (
-    build_df_from_warehouse_using_fields_file,
-    ingest_to_data_warehouse,
-)
+from transformers import (build_df_from_warehouse_using_fields_file,
+                          ingest_to_data_warehouse)
 
 logging.basicConfig()
 logging.getLogger("apscheduler").setLevel(logging.DEBUG)
 
+squirrel_path = "./scrat"
+print(squirrel_path, "exists?", os.path.exists(squirrel_path))
 
 MONTHS = {
     "01": "January",
