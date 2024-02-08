@@ -10,3 +10,6 @@ services:
     volumes:
       - ./.scrat:.scrat
     restart: unless-stopped
+
+volumes:
+  .scrat:
