@@ -1,28 +1,37 @@
+import io
 import os
 import re
+import time
 from datetime import datetime
-from functools import lru_cache
+
+# from functools import lru_cache
 from glob import glob
 
 import pandas as pd
+import scrat as sc
 from pymongo.collection import Collection
 from rich import print
 
-from constants import DATA_WAREHOUSE, ROSTERS, SCHED_DATA, VHA_VIZIENT_MEDASSETS
-from constants.database_constants import TRACINGS
-from database import (
-    delete_documents,
-    gc_rbt,
-    current_contracts,
-    get_documents,
-    insert_documents,    
+from constants import (
+    DATA_WAREHOUSE,
+    ROSTERS,
+    S3_BUCKET,
+    SCHED_DATA,
+    VHA_VIZIENT_MEDASSETS,
 )
+from constants.database_constants import TRACINGS
+from database import delete_documents, gc_rbt, get_documents, insert_documents
 from s3_functions import SET_COLUMNS, get_field_file_body_and_decode_kwargs
-
-from .ingest import *
-from .load import *
+from s3_storage import CLIENT
+from .ingest import GET_CLEAN_DF_TO_INGEST, GET_DTYPES, GET_DTYPES_S3
+from .load import BUILD_AGGREGATION, CONVERT_UOM, FIX_ADDRESS, FIX_NAME
 
 roster_collection = gc_rbt(ROSTERS)
+
+
+def print_time(func, t0, t1):
+    print(f"{func.__name__} took {t1-t0:.1f}s")
+
 
 def ingest_to_data_warehouse(
     year: str,
@@ -34,7 +43,6 @@ def ingest_to_data_warehouse(
     prefix: str = None,
     key: str = None,
 ) -> pd.DataFrame:
-
     assert year is not None, "year is required"
     assert month is not None, "month is required"
 
@@ -69,7 +77,6 @@ def ingest_to_data_warehouse(
         )
 
     else:
-
         assert file_path is not None, "file_path is required"
         assert os.path.exists(file_path) is True, "File not found"
 
@@ -85,8 +92,8 @@ def ingest_to_data_warehouse(
             try:
                 df["Invoice Date"] = df["Invoice Date"].str.rstrip(".0")
                 df["Invoice #"] = df["Invoice #"].str.rstrip(".0")
-            except:
-                pass
+            except Exception as e:
+                print(e)
 
         elif re.search(r"(csv|txt)$", file_path, re.IGNORECASE):
             df = pd.read_csv(
@@ -146,7 +153,8 @@ def ingest_concordance_data_files(
     print(sum_total)
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
+@sc.stash()
 def find_license(
     collection: Collection = roster_collection,
     group: str = "",
@@ -185,7 +193,8 @@ def find_license(
     return member_id, score
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
+@sc.stash()
 def find_item_in_database(item: str) -> dict:
     collection = gc_rbt(SCHED_DATA)
 
@@ -194,7 +203,8 @@ def find_item_in_database(item: str) -> dict:
     return result
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
+@sc.stash()
 def find_item_and_convert_uom(item: str, uom: str, qty: int) -> float:
     item_dict = find_item_in_database(item)
 
@@ -204,7 +214,8 @@ def find_item_and_convert_uom(item: str, uom: str, qty: int) -> float:
     return CONVERT_UOM(item_dict, uom, qty)
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
+@sc.stash()
 def add_license(gpo: str, name: str, address: str, city: str, state: str) -> str:
     gpo = "MEDASSETS" if gpo in VHA_VIZIENT_MEDASSETS else gpo
 
@@ -223,8 +234,10 @@ def add_license(gpo: str, name: str, address: str, city: str, state: str) -> str
 
     return f"{lic}|{score}"
 
+
 def add_gpo_to_df(contract: str) -> str:
-    global current_contracts
+    from database import current_contracts
+
     contract = contract.upper().strip()
     return current_contracts.get(contract, "MISSING CONTRACT").upper()
 
@@ -453,7 +466,10 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         df[cost] = df.apply(lambda x: x[cost] * x[ship_qty], axis=1)
 
     # print("add_gpo() >\t", add_gpo_to_df.cache_info())
+    t0 = time.time()
     df[gpo] = df.apply(lambda x: add_gpo_to_df(x[contract]), axis=1)
+    t1 = time.time()
+    print_time(add_gpo_to_df, t0, t1)
     # print("add_gpo() >\t", add_gpo_to_df.cache_info())
 
     if cull_missing_contracts:
@@ -464,12 +480,15 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         df[score] = 99
         df[check] = False
     else:
-        print("add_license() >\t", add_license.cache_info())
+        # print("add_license() >\t", add_license.cache_info())
+        t0 = time.time()
         df["temp"] = df.apply(
             lambda x: add_license(x[gpo], x[name], x[addr], x[city], x[state]),
             axis=1,
         )
-        print("add_license() >\t", add_license.cache_info())
+        t1 = time.time()
+        print_time(add_license, t0, t1)
+        # print("add_license() >\t", add_license.cache_info())
 
         df[lic] = df.apply(lambda x: str(x["temp"].split("|")[0]), axis=1)
         df[score] = df.apply(lambda x: float(x["temp"].split("|")[1]), axis=1)
@@ -478,14 +497,17 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
         confidence_min = df[score].mean() * 0.85
         df[check] = df.apply(lambda x: x[score] <= confidence_min, axis=1)
 
-    print("find_item_and_convert_uom() >\t", find_item_and_convert_uom.cache_info())
+    # print("find_item_and_convert_uom() >\t", find_item_and_convert_uom.cache_info())
+    t0 = time.time()
     df[cs_conv] = df.apply(
         lambda x: find_item_and_convert_uom(
             str(x[part]).lstrip("0"), x[uom], x[ship_qty]
         ),
         axis=1,
     )
-    print("find_item_and_convert_uom() >\t", find_item_and_convert_uom.cache_info())
+    t1 = time.time()
+    print_time(find_item_and_convert_uom, t0, t1)
+    # print("find_item_and_convert_uom() >\t", find_item_and_convert_uom.cache_info())
 
     df = df[orig_cols].copy()
 
@@ -498,5 +520,7 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
             "period": period,
         }
     )
+
+    print(f"Inserting {len(df)} records into {TRACINGS}")
 
     return df
