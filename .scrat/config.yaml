@@ -1,0 +1,4 @@
+base_path: C:\Users\jeff\Documents\GitHub\busse-rebate-tracer-api-v3\.scrat
+cache_policy: lru
+max_size: null
+ttl: null
