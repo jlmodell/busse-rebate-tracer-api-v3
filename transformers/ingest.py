@@ -69,7 +69,7 @@ def GET_DTYPES_S3(
     except Exception as e:
         print(e)
 
-    print(dtypes)
+    # print(dtypes)
 
     return dtypes
 
@@ -106,7 +106,5 @@ def GET_CLEAN_DF_TO_INGEST(
     df["__month__"] = month
 
     df.columns = [str(x) for x in df.columns]
-
-    return df
 
     return df

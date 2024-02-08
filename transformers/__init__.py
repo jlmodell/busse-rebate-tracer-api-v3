@@ -1,28 +1,25 @@
+import io
 import os
 import re
 from datetime import datetime
 from functools import lru_cache
-from glob import glob
 
 import pandas as pd
 from pymongo.collection import Collection
 from rich import print
 
 from constants import DATA_WAREHOUSE, ROSTERS, SCHED_DATA, VHA_VIZIENT_MEDASSETS
-from constants.database_constants import TRACINGS
-from database import (
-    delete_documents,
-    gc_rbt,
-    current_contracts,
-    get_documents,
-    insert_documents,    
-)
+from database import delete_documents, gc_rbt, get_documents, insert_documents
 from s3_functions import SET_COLUMNS, get_field_file_body_and_decode_kwargs
+from s3_storage import CLIENT, S3_BUCKET
 
 from .ingest import *
 from .load import *
 
+# from .transform_with_polars import *
+
 roster_collection = gc_rbt(ROSTERS)
+
 
 def ingest_to_data_warehouse(
     year: str,
@@ -33,77 +30,46 @@ def ingest_to_data_warehouse(
     file_path: str = None,
     prefix: str = None,
     key: str = None,
+    debug: bool = False,
 ) -> pd.DataFrame:
-
     assert year is not None, "year is required"
     assert month is not None, "month is required"
 
-    if prefix is not None and key is not None:
-        dtype = GET_DTYPES_S3(
-            prefix=prefix, key=key, delimiter=delimiter, header_row=header_row
+    dtype = GET_DTYPES_S3(
+        prefix=prefix, key=key, delimiter=delimiter, header_row=header_row
+    )
+
+    assert len(dtype) > 0, "No columns found"
+
+    if re.search(r".xl(sx|sm|s)$", key, re.IGNORECASE):
+        df = pd.read_excel(
+            io.BytesIO(
+                CLIENT.get_object(Bucket=S3_BUCKET, Key=prefix + key)["Body"].read()
+            ),
+            header=header_row if header_row != -1 else None,
+            dtype=dtype,
         )
 
-        assert len(dtype) > 0, "No columns found"
-
-        if re.search(r".xl(sx|sm|s)$", key, re.IGNORECASE):
-            df = pd.read_excel(
-                io.BytesIO(
-                    CLIENT.get_object(Bucket=S3_BUCKET, Key=prefix + key)["Body"].read()
-                ),
-                header=header_row if header_row != -1 else None,
-                dtype=dtype,
-            )
-
-        elif re.search(r".(csv|txt)$", key, re.IGNORECASE):
-            df = pd.read_csv(
-                io.BytesIO(
-                    CLIENT.get_object(Bucket=S3_BUCKET, Key=prefix + key)["Body"].read()
-                ),
-                delimiter=delimiter,
-                header=header_row if header_row != -1 else None,
-                dtype=dtype,
-            )
-
-        df = GET_CLEAN_DF_TO_INGEST(
-            df=df, file_path=prefix + key, month=month, year=year
+    elif re.search(r".(csv|txt)$", key, re.IGNORECASE):
+        df = pd.read_csv(
+            io.BytesIO(
+                CLIENT.get_object(Bucket=S3_BUCKET, Key=prefix + key)["Body"].read()
+            ),
+            delimiter=delimiter,
+            header=header_row if header_row != -1 else None,
+            dtype=dtype,
         )
 
-    else:
+    df = GET_CLEAN_DF_TO_INGEST(df=df, file_path=prefix + key, month=month, year=year)
 
-        assert file_path is not None, "file_path is required"
-        assert os.path.exists(file_path) is True, "File not found"
-
-        dtype = GET_DTYPES(file_path, delimiter=delimiter, header_row=header_row)
-
-        assert len(dtype) > 0, "No columns found"
-
-        if re.search(r"xl(s|sx|sm)$", file_path, re.IGNORECASE):
-            df = pd.read_excel(
-                file_path, dtype=dtype, header=header_row if header_row != -1 else None
-            )
-
-            try:
-                df["Invoice Date"] = df["Invoice Date"].str.rstrip(".0")
-                df["Invoice #"] = df["Invoice #"].str.rstrip(".0")
-            except:
-                pass
-
-        elif re.search(r"(csv|txt)$", file_path, re.IGNORECASE):
-            df = pd.read_csv(
-                file_path,
-                dtype=dtype,
-                delimiter=delimiter,
-                header=header_row if header_row != -1 else None,
-            )
-
-        df = GET_CLEAN_DF_TO_INGEST(df=df, file_path=file_path, month=month, year=year)
-
-    print(df)
+    if debug:
+        print(df)
 
     if overwrite:
         collection = gc_rbt(DATA_WAREHOUSE)
 
-        print("Overwriting")
+        if debug:
+            print("Overwriting")
 
         try:
             file_path = os.path.basename(file_path)
@@ -122,28 +88,6 @@ def ingest_to_data_warehouse(
         insert_documents(collection, df.to_dict("records"))
 
     return df
-
-
-def ingest_concordance_data_files(
-    folder_path: str, year: str, month: str, overwrite: bool = False
-):
-    assert folder_path is not None, "folder path is required"
-
-    file_paths = glob(os.path.join(folder_path, "*.xls*"))
-
-    sum_total = 0
-
-    for file_path in file_paths:
-        df = ingest_to_data_warehouse(
-            file_path=file_path,
-            year=year,
-            month=month,
-            overwrite=overwrite,
-        )
-
-        sum_total += df["REBATE $"].sum()
-
-    print(sum_total)
 
 
 @lru_cache(maxsize=None)
@@ -223,15 +167,37 @@ def add_license(gpo: str, name: str, address: str, city: str, state: str) -> str
 
     return f"{lic}|{score}"
 
+
 def add_gpo_to_df(contract: str) -> str:
-    global current_contracts
+    from database import current_contracts
+
     contract = contract.upper().strip()
     return current_contracts.get(contract, "MISSING CONTRACT").upper()
 
 
+def time_execution(func):
+    """
+    Decorator to time the execution of a function and print the elapsed time.
+    """
+    import functools
+    import time
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()  # Start timing
+        result = func(*args, **kwargs)  # Execute the function
+        end_time = time.time()  # End timing
+        elapsed_time = end_time - start_time  # Calculate elapsed time
+        print(f"Function {func.__name__} took {elapsed_time:.6f} seconds to execute.")
+        return result
+
+    return wrapper
+
+
+@time_execution
 def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
     data_warehouse_collection = gc_rbt(DATA_WAREHOUSE)
-    tracings_collection = gc_rbt(TRACINGS)
+    # tracings_collection = gc_rbt(TRACINGS)
 
     hidden = "hidden"
     gpo = "GPO"
@@ -242,7 +208,7 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
 
     kwargs = get_field_file_body_and_decode_kwargs(prefix="input/", key=fields_file)
 
-    print(kwargs)
+    # print(kwargs)
 
     # initialize variables for dataframe from fields_file
 
@@ -493,10 +459,18 @@ def build_df_from_warehouse_using_fields_file(fields_file: str) -> pd.DataFrame:
 
     df.columns = output_cols
 
-    tracings_collection.delete_many(
-        {
-            "period": period,
-        }
-    )
+    df.to_excel("original.xlsx", index=False)
+
+    # tracings_collection.delete_many(
+    #     {
+    #         "period": period,
+    #     }
+    # )
 
     return df
+
+
+if __name__ == "__main__":
+    df = build_df_from_warehouse_using_fields_file(
+        fields_file="concordance.json",
+    )

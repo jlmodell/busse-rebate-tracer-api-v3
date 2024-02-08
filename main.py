@@ -11,15 +11,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from constants import DISCORD_URL
-from database.redis_connector import push_to_redis_queue
+from database import refresh_current_contracts
 
 # from database import delete_documents, gc_rbt, insert_documents
 from finders import find_tracings_and_save
-from s3_functions import (
-    get_field_file_body_and_decode_kwargs,
-    move_file_to_completed_folder,
-)
-from database import refresh_current_contracts
+from s3_functions import get_field_file_body_and_decode_kwargs
 
 # from s3_functions import get_field_file_body_and_decode_kwargs
 from s3_functions.getters import get_list_of_files
@@ -86,17 +82,17 @@ def insert_tracings(
 
     list_of_dict_json = json.loads(json_string)["data"]
 
-    try:
-        for each in list_of_dict_json:
-            push_to_redis_queue(each)
+    # try:
+    #     for each in list_of_dict_json:
+    #         push_to_redis_queue(each)
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
 
-    try:
-        move_file_to_completed_folder(prefix, storage_key, success_key)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # try:
+    #     move_file_to_completed_folder(prefix, storage_key, success_key)
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
 
     # s3 move file to completed folder
 
@@ -129,6 +125,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 async def startup_event():
     global current_contracts
@@ -149,7 +146,7 @@ async def startup_event():
         "interval",
         minutes=360,
         id="refresh_current_contracts",
-        replace_existing=True
+        replace_existing=True,
     )
 
 
@@ -183,6 +180,33 @@ async def ingest_file_form(request: Request):
     }
 
     return templates.TemplateResponse("ingest_file.html", context)
+
+
+# @app.get("/ingest_file_polars", response_class=HTMLResponse)
+# async def ingest_file_form_polars(request: Request):
+#     title = "Ingest File to Data Warehouse Using Polars"
+
+#     regex_field_file = re.compile(
+#         r"(backups|gpo_report|^input/$|old|updated|13104)", re.IGNORECASE
+#     )
+
+#     prefix = "input/"
+
+#     field_files = get_list_of_files(prefix)
+
+#     field_files = [
+#         field_file.replace(prefix, "")
+#         for field_file in field_files
+#         if regex_field_file.search(field_file) is None
+#     ]
+
+#     context = {
+#         "request": request,
+#         "title": title,
+#         "field_files": field_files,
+#     }
+
+#     return templates.TemplateResponse("ingest_file_polars.html", context)
 
 
 @app.get("/files")
@@ -280,6 +304,31 @@ async def ingest_file(
         "output": {"key": storage_key, "field_file": field_file_name},
         "status": "success",
     }
+
+
+# @app.post("/ingest_file_polars", response_class=HTMLResponse)
+# async def ingest_file_post_polars(
+#     month: str = Form(...),
+#     year: str = Form(...),
+#     file_name: str = Form(...),
+#     field_file_name: str = Form(...),
+#     delimiter: str = Form(default=","),
+#     header_row: str = Form(default="0"),
+#     # background_tasks: BackgroundTasks = BackgroundTasks(),
+# ):
+#     # prefix = "rebate_trace_files/"
+
+#     # if month not in MONTHS:
+#     # raise HTTPException(status_code=400, detail="Invalid month")
+
+#     # storage_key = f"{MONTHS[month].lower()} {year}/{file_name}"
+#     # success_key = f"{MONTHS[month].lower()} {year}/completed/{file_name}"
+
+#     df = build_df_from_warehouse_using_fields_file_using_polars(field_file_name)
+
+#     print(df)
+
+#     return df.to_html()
 
 
 @app.get("/update_tracings", response_class=HTMLResponse)

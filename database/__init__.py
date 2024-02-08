@@ -1,10 +1,8 @@
-from .connector import GET_CLIENT, GET_COLLECTION, GET_DATABASE
-
 from pymongo.collection import Collection
 
 from constants import BUSSE_PRICING, BUSSE_REBATE_TRACES, CONTRACTS, PRICING_CONTRACTS
 
-
+from .connector import GET_CLIENT, GET_COLLECTION, GET_DATABASE
 
 
 def gc_rbt(collection_key: str) -> Collection:
@@ -36,11 +34,14 @@ def get_current_contracts():
 
     return {x["contract"]: x["gpo"] for x in list(collection.find({"valid": True}))}
 
+
 current_contracts = get_current_contracts()
+
 
 def refresh_current_contracts():
     global current_contracts
     current_contracts = get_current_contracts()
+
 
 def find_contract_by_contract_number(contract_number: str = None) -> dict:
     assert contract_number is not None, "contract_number cannot be None"
@@ -58,4 +59,4 @@ def find_contract_by_contract_number(contract_number: str = None) -> dict:
 
 
 def get_documents(collection: Collection, filter: dict) -> list:
-    return list(collection.find(filter))
+    return list(collection.find(filter, {"_id": 0}))
