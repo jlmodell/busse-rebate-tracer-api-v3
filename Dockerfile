@@ -3,6 +3,8 @@ FROM tiangolo/uvicorn-gunicorn-fastapi:latest
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
+RUN scrat init
+
 EXPOSE 8188
 
 COPY . .
